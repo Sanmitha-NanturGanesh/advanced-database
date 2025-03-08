@@ -35,11 +35,10 @@ def get_kinds():
 def get_pet(id):
     cursor = connection.cursor()
     cursor.execute(f"""select * from pet where id = ?""", (id,))
-    rows = cursor.fetchall()
+    rows = cursor.fetchone()
     try:
-        (id, name, xtype, age, owner) = rows[0]
-        data = {"id": id, "name": name, "kind": kind, "age": age, "owner": owner}
-
+        (id, name, kind_id, age, owner) = rows[0]
+        data = {"id": id, "name": name, "kind_id": kind_id, "age": age, "owner": owner}
         return data
     except:
         return "Data not found."
@@ -80,17 +79,45 @@ def test_create_pet():
     pass
 
 
+# def update_pet(id, data):
+#     try:
+#         data["age"] = int(data["age"])
+#     except:
+#         data["age"] = 0
+#     cursor = connection.cursor()
+#     cursor.execute(
+#         """update pet set name=?, age=?, kind_id=?, owner=? where id=?""",
+#         (data["name"], data["age"], data["kind_id"], data["owner"], id),
+#     )
+#     connection.commit()
+
 def update_pet(id, data):
     try:
+        # Convert age to integer and handle invalid age input
         data["age"] = int(data["age"])
-    except:
-        data["age"] = 0
+    except ValueError:
+        data["age"] = 0  # Set default age to 0 if invalid
+
+    # Validate that all required fields are present
+    if not all(key in data for key in ["name", "age", "kind_id", "owner"]):
+        raise ValueError("Missing required fields")
+
     cursor = connection.cursor()
+
+    # Ensure the kind_id is valid
+    cursor.execute("SELECT COUNT(*) FROM kind WHERE id = ?", (data["kind_id"],))
+    if cursor.fetchone()[0] == 0:
+        raise ValueError(f"Invalid kind_id: {data['kind_id']}")
+
+    # Execute the update query
     cursor.execute(
-        """update pet set name=?, age=?, type=?, owner=? where id=?""",
-        (data["name"], data["age"], data["type"], data["owner"], id),
+        """UPDATE pet SET name=?, age=?, kind_id=?, owner=? WHERE id=?""",
+        (data["name"], data["age"], data["kind_id"], data["owner"], id),
     )
+    
+    # Commit the transaction
     connection.commit()
+
 
 def update_kind(id, data):
     cursor = connection.cursor()
@@ -192,9 +219,31 @@ def test_get_kinds():
     assert type(kind["id"]) is int
     assert type(kind["name"]) is str
 
+def test_update_pet():
+    pets = get_pets()
+    if not pets:
+        raise RuntimeError("No pets found to update!")
+    
+    pet = pets[0]
+    print(f"Original pet: {pet}")
+
+    updated_data = {
+        "name": "UpdatedName",
+        "age": pet["age"] + 1,
+        "kind_id": pet["kind_id"],
+        "owner": "UpdatedOwner"
+    }
+    update_pet(pet["id"], updated_data)
+
+    updated_pet = get_pet(pet["id"])
+    print(f"Updated pet: {updated_pet}")
+    assert updated_pet["name"] == "UpdatedName"
+    assert updated_pet["owner"] == "UpdatedOwner"
+
+
 if __name__ == "__main__":
     setup_test_database()
     test_get_pets()
     test_get_kinds()
-    test_create_pet()
+    test_update_pet()
     print("done.")

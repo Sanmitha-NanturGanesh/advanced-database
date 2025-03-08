@@ -42,12 +42,18 @@ def get_delete(id):
 
 @app.route("/update/<id>", methods=["GET"])
 def get_update(id):
-    data = database.get_pet(id)
-    return render_template("update.html",data=data)
+    try:
+        data = database.get_pet(id)
+        if data is None:
+            return render_template("error.html", error_text="Pet not found")
+        return render_template("update.html", data=data)
+    except Exception as e:
+        return f"Error occurred: {str(e)}", 500
 
 @app.route("/update/<id>", methods=["POST"])
 def post_update(id):
     data = dict(request.form)
+    print(f"Updating pet {id} with data: {data}")
     database.update_pet(id, data)
     return redirect(url_for("get_list"))  
 
